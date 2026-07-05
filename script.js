@@ -1,11 +1,11 @@
 // Configuración básica de la escena 3D
 const container = document.getElementById('canvas-container');
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x020208, 0.015);
+scene.fog = new THREE.FogExp2(0x0a0502, 0.012); // Niebla sutil con tono cálido oscuro
 
 // Cámara
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 30, 50);
+camera.position.set(0, 20, 55);
 
 // Renderizador
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -13,68 +13,80 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 container.appendChild(renderer.domElement);
 
-// Controles de órbita para interactuar de forma táctil en el celular
+// Controles táctiles/ratón equilibrados para móvil
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-controls.maxDistance = 120;
+controls.maxDistance = 100;
 controls.minDistance = 15;
 
 // --- 1. FONDO DE ESTRELLAS ---
 const estrellasGeo = new THREE.BufferGeometry();
-const cantEstrellas = 1500;
+const cantEstrellas = 2000;
 const posicionesEstrellas = new Float32Array(cantEstrellas * 3);
 
 for(let i = 0; i < cantEstrellas * 3; i += 3) {
-    posicionesEstrellas[i] = (Math.random() - 0.5) * 300;
-    posicionesEstrellas[i+1] = (Math.random() - 0.5) * 300;
-    posicionesEstrellas[i+2] = (Math.random() - 0.5) * 300;
+    posicionesEstrellas[i] = (Math.random() - 0.5) * 400;
+    posicionesEstrellas[i+1] = (Math.random() - 0.5) * 400;
+    posicionesEstrellas[i+2] = (Math.random() - 0.5) * 400;
 }
 estrellasGeo.setAttribute('position', new THREE.BufferAttribute(posicionesEstrellas, 3));
-const estrellasMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.5, transparent: true, opacity: 0.8 });
+const estrellasMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.4, transparent: true, opacity: 0.7 });
 const campoEstrellas = new THREE.Points(estrellasGeo, estrellasMat);
 scene.add(campoEstrellas);
 
 
-// --- 2. EL AGUJERO NEGRO (Centro del Universo) ---
-// El horizonte de sucesos (esfera negra central)
+// --- 2. EL AGUJERO NEGRO (Centro Absoluto) ---
 const horizonteGeo = new THREE.SphereGeometry(4, 32, 32);
 const horizonteMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
 const horizonteSucesos = new THREE.Mesh(horizonteGeo, horizonteMat);
 scene.add(horizonteSucesos);
 
-// Generar una textura procedimental en canvas para el brillo del disco
-function crearTexturaDisco() {
-    const canvasDisco = document.createElement('canvas');
-    canvasDisco.width = 256;
-    canvasDisco.height = 256;
-    const ctx = canvasDisco.getContext('2d');
-    const gradiente = ctx.createRadialGradient(128, 128, 30, 128, 128, 128);
-    gradiente.addColorStop(0, 'rgba(255, 255, 255, 1)');
-    gradiente.addColorStop(0.1, 'rgba(255, 140, 0, 1)');   // Naranja brillante interno
-    gradiente.addColorStop(0.4, 'rgba(255, 69, 0, 0.6)');   // Rojo intermedio
-    gradiente.addColorStop(0.8, 'rgba(138, 43, 226, 0.2)'); // Halo morado exterior
-    gradiente.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = gradiente;
-    ctx.fillRect(0, 0, 256, 256);
-    return new THREE.CanvasTexture(canvasDisco);
-}
 
-// Disco de acreción plano y distorsionado (Anillo gigante)
-const discoGeo = new THREE.RingGeometry(4.5, 18, 64);
-// Orientamos el disco horizontalmente
-discoGeo.rotateX(-Math.PI / 2);
-const discoMat = new THREE.MeshBasicMaterial({
-    map: crearTexturaDisco(),
-    side: THREE.DoubleSide,
-    transparent: true,
-    blending: THREE.AdditiveBlending
+// --- 3. HALO LUMINOSO VOLUMÉTRICO 360° (Custom Shader) ---
+// Este sombreador calcula la luz basándose en el ángulo de la cámara (Fresnel effect).
+// No importa cómo gires la pantalla, la luz siempre se verá esférica, tridimensional y perfecta.
+const glowVertexShader = `
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    void main() {
+        vNormal = normalize(normalMatrix * normal);
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        vViewPosition = -mvPosition.xyz;
+        gl_Position = projectionMatrix * mvPosition;
+    }
+`;
+
+const glowFragmentShader = `
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    void main() {
+        vec3 normal = normalize(vNormal);
+        vec3 viewDir = normalize(vViewPosition);
+        
+        // Intensidad basada en la curvatura de la esfera orientada a la cámara
+        float intensity = pow(0.7 - dot(normal, viewDir), 2.5);
+        
+        // Color naranja/fuego intenso de la galaxia de amor
+        vec3 glowColor = vec3(1.0, 0.45, 0.08); 
+        
+        gl_FragColor = vec4(glowColor * intensity * 2.2, intensity);
+    }
+`;
+
+const haloGeo = new THREE.SphereGeometry(15, 32, 32); // Esfera expansiva de luz
+const haloMat = new THREE.ShaderMaterial({
+    vertexShader: glowVertexShader,
+    fragmentShader: glowFragmentShader,
+    blending: THREE.AdditiveBlending,
+    side: THREE.BackSide, // Se renderiza por detrás para envolver suavemente el núcleo
+    transparent: true
 });
-const discoAcrecion = new THREE.Mesh(discoGeo, discoMat);
-scene.add(discoAcrecion);
+const halo360 = new THREE.Mesh(haloGeo, haloMat);
+scene.add(halo360);
 
 
-// --- 3. GENERADOR DE TEXTO EN 3D (Texturas flotantes) ---
+// --- 4. GENERADOR DE TEXTO FLOTANTE ---
 const palabrasBase = [
     "Paola", "Eladio", "Te amo", "Siempre juntos", "Mi amor", 
     "Mi universo", "Destino", "Felicidad", "Tú y yo", "Complicidad", 
@@ -83,22 +95,20 @@ const palabrasBase = [
     "Mi calma", "Mi paraíso", "Mi fortuna", "Alegría", "Recuerdos", "Eternidad"
 ];
 
-// Función para renderizar texto plano en un Sprite 3D transparente
 function crearSpriteTexto(texto) {
     const canvasTexto = document.createElement('canvas');
     canvasTexto.width = 512;
     canvasTexto.height = 128;
     const ctx = canvasTexto.getContext('2d');
     
-    // Estilo especial si son los nombres principales
     const esPrincipal = (texto === "Paola" || texto === "Eladio");
-    ctx.font = esPrincipal ? "bold 56px 'Segoe UI', sans-serif" : "40px 'Segoe UI', sans-serif";
+    ctx.font = esPrincipal ? "bold 58px 'Segoe UI', sans-serif" : "42px 'Segoe UI', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     
-    // Sombra brillante estilo neón
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = esPrincipal ? "#ff1493" : "#00ffff";
+    // Brillo del texto adaptado al color cálido
+    ctx.shadowBlur = 18;
+    ctx.shadowColor = esPrincipal ? "#ff4500" : "#ffcc00";
     ctx.fillStyle = "#ffffff";
     
     ctx.fillText(texto, 256, 64);
@@ -107,25 +117,24 @@ function crearSpriteTexto(texto) {
     const material = new THREE.SpriteMaterial({ map: textura, transparent: true });
     const sprite = new THREE.Sprite(material);
     
-    // Escalar según la importancia de la palabra
-    sprite.scale.set(esPrincipal ? 10 : 7, esPrincipal ? 2.5 : 1.75, 1);
+    sprite.scale.set(esPrincipal ? 11 : 7.5, esPrincipal ? 2.75 : 1.85, 1);
     return sprite;
 }
 
-// Estructura de datos de las letras gravitando
 const nubesDePalabras = [];
 
 palabrasBase.forEach((palabra) => {
     const sprite = crearSpriteTexto(palabra);
     
-    // Parámetros orbitales aleatorios
+    // Configuraciones orbitales tridimensionales
     const datosOrbita = {
         mesh: sprite,
-        radio: Math.random() * 16 + 8, // Distancia al agujero negro
-        velocidad: (Math.random() * 0.02 + 0.005) * (Math.random() > 0.5 ? 1 : -1),
+        radio: Math.random() * 18 + 7, 
+        // VELOCIDAD REDUCIDA: Ahora van súper lento y estables
+        velocidad: (Math.random() * 0.003 + 0.0015) * (Math.random() > 0.5 ? 1 : -1),
         angulo: Math.random() * Math.PI * 2,
-        // Inclinación leve en los ejes Y y Z para dar volumen real 3D
-        offsetY: (Math.random() - 0.5) * 3
+        offsetY: (Math.random() - 0.5) * 8, // Mayor dispersión esférica vertical
+        faseFlote: Math.random() * Math.PI
     };
     
     scene.add(sprite);
@@ -133,7 +142,7 @@ palabrasBase.forEach((palabra) => {
 });
 
 
-// --- 4. BUCLE DE ANIMACIÓN Y FÍSICA ---
+// --- 5. BUCLE DE RENDERING Y ANIMACIÓN ---
 const reloj = new THREE.Clock();
 
 function animate() {
@@ -141,37 +150,31 @@ function animate() {
     
     const tiempo = reloj.getElapsedTime();
     
-    // Rotación sutil del disco del agujero negro
-    discoAcrecion.rotation.y = tiempo * 0.15;
+    // Pulsación suave del halo de luz central (Efecto respiración cósmica)
+    const factorEscala = 1 + Math.sin(tiempo * 0.8) * 0.04;
+    halo360.scale.set(factorEscala, factorEscala, factorEscala);
     
-    // Hacer orbitar las palabras alrededor del centro
+    // Movimiento lento y gravitatorio de las palabras
     nubesDePalabras.forEach(p => {
         p.angulo += p.velocidad;
         
-        // Ecuación de órbita circular tridimensional
+        // Posicionamiento en órbita alrededor de la esfera de luz
         p.mesh.position.x = Math.cos(p.angulo) * p.radio;
         p.mesh.position.z = Math.sin(p.angulo) * p.radio;
-        // Ondulación gravitacional suave vertical
-        p.mesh.position.y = p.offsetY + Math.sin(tiempo + p.radio) * 0.5;
         
-        // Efecto atracción: si se acercan demasiado al horizonte de sucesos, parpadean
-        if(p.radio < 9) {
-            p.mesh.material.opacity = 0.4 + Math.sin(tiempo * 10) * 0.3;
-        }
+        // Movimiento vertical flotante ultra sutil
+        p.mesh.position.y = p.offsetY + Math.sin(tiempo * 0.4 + p.faseFlote) * 0.8;
     });
     
-    // Actualizar controles táctiles
     controls.update();
-    
     renderer.render(scene, camera);
 }
 
-// Soporte para redimensionar pantallas automáticamente (vistas verticales de móviles)
+// Auto-ajuste para pantallas de celulares (vertical/horizontal)
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Arrancar la simulación
 animate();
