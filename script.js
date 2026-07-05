@@ -175,7 +175,3 @@ window.addEventListener('resize', () => {
 
 // Arrancar la simulación
 animate();
-    requestAnimationFrame(animar);
-}
-
-animar();
