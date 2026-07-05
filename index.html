@@ -3,17 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nuestro Universo - Paola & Eladio</title>
+    <title>Universo de Amor - Paola & Eladio</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Cargamos Three.js y OrbitControls desde CDN confiables -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
 
-    <div id="centro">
-        <h1>Paola & Eladio</h1>
-        <p>Feliz Cumple Mes</p>
+    <div id="UI-overlay">
+        <h2>GALAXY OF LOVE</h2>
+        <p>Arrastra para girar en 3D 🌌</p>
     </div>
 
-    <canvas id="universo"></canvas>
+    <div id="canvas-container"></div>
 
     <script src="script.js"></script>
 </body>
