@@ -43,9 +43,7 @@ const horizonteSucesos = new THREE.Mesh(horizonteGeo, horizonteMat);
 scene.add(horizonteSucesos);
 
 
-// --- 3. HALO LUMINOSO VOLUMÉTRICO 360° (Custom Shader) ---
-// Este sombreador calcula la luz basándose en el ángulo de la cámara (Fresnel effect).
-// No importa cómo gires la pantalla, la luz siempre se verá esférica, tridimensional y perfecta.
+// --- 3. HALO LUMINOSO VOLUMÉTRICO 360° (Custom Shader Actualizado) ---
 const glowVertexShader = `
     varying vec3 vNormal;
     varying vec3 vViewPosition;
@@ -64,27 +62,32 @@ const glowFragmentShader = `
         vec3 normal = normalize(vNormal);
         vec3 viewDir = normalize(vViewPosition);
         
-        // Intensidad basada en la curvatura de la esfera orientada a la cámara
-        float intensity = pow(0.7 - dot(normal, viewDir), 2.5);
+        // Controla la caída de la luz desde el centro hacia los bordes
+        // Aumentamos el exponente a 3.5 para que el desvanecimiento final sea ultra suave
+        float intensidad = pow(0.85 - dot(normal, viewDir), 3.5);
         
-        // Color naranja/fuego intenso de la galaxia de amor
-        vec3 glowColor = vec3(1.0, 0.45, 0.08); 
+        // Color naranja fuego de la imagen
+        vec3 glowColor = vec3(1.0, 0.42, 0.05); 
         
-        gl_FragColor = vec4(glowColor * intensity * 2.2, intensity);
+        // Multiplicamos la opacidad final para que el centro sea bien denso/opaco
+        // y los extremos mueran en transparencia absoluta (0.0)
+        float opacidadFinal = clampledIntensity = clamp(intensidad * 3.0, 0.0, 1.0);
+        
+        gl_FragColor = vec4(glowColor * intensidad * 4.0, opacidadFinal);
     }
 `;
 
-const haloGeo = new THREE.SphereGeometry(15, 32, 32); // Esfera expansiva de luz
+// Incrementamos ligeramente el tamaño de la esfera de luz para que la transición sea más espaciosa
+const haloGeo = new THREE.SphereGeometry(18, 32, 32); 
 const haloMat = new THREE.ShaderMaterial({
     vertexShader: glowVertexShader,
     fragmentShader: glowFragmentShader,
     blending: THREE.AdditiveBlending,
-    side: THREE.BackSide, // Se renderiza por detrás para envolver suavemente el núcleo
+    side: THREE.BackSide, 
     transparent: true
 });
 const halo360 = new THREE.Mesh(haloGeo, haloMat);
 scene.add(halo360);
-
 
 // --- 4. GENERADOR DE TEXTO FLOTANTE ---
 const palabrasBase = [
